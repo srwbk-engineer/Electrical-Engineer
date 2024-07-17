@@ -118,7 +118,66 @@ class Grid(object):
         self.Y = np.zeros((self.nb, self.nb), dtype=complex)
         self.nl = len(self.lines)
         self.create_matrix() 
-        self.Pl = np.vstack([node.PLi for node in self.nodes])
+        self.Pl = np.vstack([node.PLi for node in self.nodes])  
+        self.Ql = np.vstack([node.QLi for node in self.nodes])
+        self.Pg = np.vstack([node.PGi for node in self.nodes])
+        self.Qg = np.vstack([node.QGi for node in self.nodes]) 
+        self.Psp = self.Pg - self.Pl 
+        self.Qsp = self.Qg - self.Ql 
 
-                 
+
+    @property
+    def nb(self):
+        fromBus = [line.formNode.nodeNumber for line in self.lines] 
+        toBus = [line.toNode.nodeNumber for line in self.lines] 
+        return max(max(fromBus), max(toBus)) + 1 
+    
+    def get_node_by_number(self, number: int): 
+        for node in self.nodes: 
+            if node.nodeNumber == number: 
+                return node 
+        raise NameError("No node with number %d." % number) 
+    
+    def get_line_by_number(self, number: int): 
+        for line in self.lines:
+            if line.lineNumber == number: 
+                return line 
+            raise NameError("No line with number %d." % number)
         
+
+    def get_lines_by_node(self, nodeNumber):
+        lines = [line for line in self.lines if 
+                 (line.toNode.nodeNumber == nodeNumber or line.fromNode.nodeNumber == nodeNumber)]
+        
+        return lines 
+    
+    @property 
+    def pq_nodes(self):
+        pq_nodes = [node for node in self.nodes if node.type == 3] 
+        return pq_nodes 
+    
+    @property 
+    def pv_nodes(self):
+        pv_nodes = [node for node in self.nodes if node.type == 2] 
+        return pv_nodes 
+    
+    def create_matrix(self):
+        # off diagonal elements 
+        for k in range(self.nl):
+            line = self.lines[k]
+            fromNode = line.formNode.nodeNumber 
+            toNode = line.toNode.nodeNumber 
+            self.Y[fromNode, toNode] -= line.y/line.x_prime
+            self.Y[toNode, fromNode] -= line.Y/line.x_prime
+
+        # diagonal elements 
+        for m in range(self.nb): 
+            for n in range(self.nl):
+                line = self.lines[n] 
+                if line.fromNode.nodeNumber == m:
+                    self.Y[m, m] += line.y/(line.x_prime**2)+line.b 
+                elif line.toNode.nodeNumber == m:
+                    self.Y[m, m] += line.y + line.b  
+
+
+                    
