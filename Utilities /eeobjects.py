@@ -109,7 +109,16 @@ class Line(object):
 
         Line.names.add(self.name) 
 
-        
-    
+class Grid(object): 
+
+    def __init__(self, nodes: list, 
+                        lines: list):
+        self.nodes = nodes 
+        self.lines = lines
+        self.Y = np.zeros((self.nb, self.nb), dtype=complex)
+        self.nl = len(self.lines)
+        self.create_matrix() 
+        self.Pl = np.vstack([node.PLi for node in self.nodes])
+
                  
         
