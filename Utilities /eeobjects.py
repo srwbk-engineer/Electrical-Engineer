@@ -295,4 +295,49 @@ class Grid(object):
             M = np.vstack((dP, dQ)) 
 
 
-                                    
+            # Calculate Jacobian. 
+
+            # J1 is the derivative of P with respect to angles 
+            J1 = np.zeros((self.nb-1, self.nb-1)) 
+            for i in range(self.nb-1): 
+                m = i + 1 
+                for k in range(self.nb-1):
+                    n = k + 1 
+                    if n == m:
+                        for n in range(self.nb): 
+                            J1[i, k] += self.nodes[m].vLf * self.nodes[n].vLf * (-G[m,n]*np.sin(angles[m]-angles[n]) + B[m, n]*np.cos(angles[m]-angles[n])) 
+                        J1[i, k] += self.nodes[m].vLf.nodes[m].vLf**2*B[m,m]
+
+                    else : 
+                        J1[i, k] = self.nodes[m].vLf*self.nodes[n].vLf*(G[m,n]*np.sin(angles[m]-angles[n]) - B[m,n]*np.cos(angles[m]-angles[n])) 
+
+            self.J1 = J1
+
+            # J2 is the derivative of P with respect to V 
+
+            J2 = np.zeros((self.nb-1, npq))
+            for i in range(self.nb-1): 
+                m = i + 1
+                for k in range(npq): 
+                    n = self.pq_nodes[k].nodeNumber
+                    if n == m:
+                        for n in range(self.nb):
+                            J2[i, k] += self.nodes[n].vLf*(G[m,n]*np.cos(angles[m]-angles[n]) + B[m,n]*np.sin(angles[m]-angles[n])) 
+                        J2[i,k] += self.nodes[m].vLf*G[m,m] 
+
+                    else :
+                        J2[i, k] = self.nodes[m].vLf*(G[m,n]*np.cos(angles[m]-angles[n]) + B[m,n]*np.sin(angles[m]-angles[n])) 
+
+            self.J2 = J2 
+
+            # J3 is the derivative of Q with respect to angles
+
+            J3 = np.zeros((npq, self.nb-1)) 
+            for i in range(npq): 
+                m = self.pq_nodes[i].nodeNumber
+                for k in range(self.nb-1): 
+                    n = k + 1
+                    if n == m:
+                        for n in range(self.nb):
+                            J3[i, k] += self.nodes[m].vLf*self.nodes[n].vLf*(G[m,n]*np.cos(angles[m]-angles[n]) + B[m,n]*np.sin(angles[m]-angles[n]))
+                            
