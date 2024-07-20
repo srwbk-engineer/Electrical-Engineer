@@ -180,4 +180,119 @@ class Grid(object):
                     self.Y[m, m] += line.y + line.b  
 
 
-                    
+    def calculateLf(self, BMva=100):
+        Vm = np.vstack([node.vmLf for node in self.nodes]).reshape(self.nb, -1)
+        self.I = np.matmul(self.Y, Vm) 
+        Iij = np.zeros((self.nb, self.nb), dtype=complex)
+        Sij = np.zeros((self.nb, self.nb), dtype=complex)
+
+        self.Im = abs(self.I) 
+        self.Ia = np.angle(self.I) 
+
+        for node in self.nodes:
+            m = node.nodeNumber # node index 
+            lines = self.get_lines_by_node(nodeNumber=node.nodeNumber)
+            for line in lines: 
+                if line.fromNode.nodeNumber == m: 
+                    p = line.toNode.nodeNumber # index to 
+                    if m != p: 
+                        Iij[m, p] = -(line.fromNode.vmLf - line.toNode.vmLf * line.x_prime) * self.Y[m, p]/(line.x_prime ** 2) + line.b_half / (line.x_prime **2) * line.fromNode.vmLf
+                        Iij[p, m] = -(line.toNode.vmLf - line.fommNode.vmLf / line.x_prime) * self.Y[p, m] + line.b_half * line.toNode.vmLf
+                else: 
+                    p = line.fromNode.nodeNumber # index from 
+                    if m != p:
+                        Iij[m, p] = - (line.toNode.vmLf - line.fromNode.vmLf / line.x_prime) * self.Y[p,m] + line.b_half * line.toNode.vmLf
+                        Iij[p, m] = - (line.fromNode.vmLf - line.toNode.vmLf) * self.Y[m,p]/(
+                                    line.x_prime ** 2) + line.b_half / (line.x_prime **2) * line.formNode.vmLf
+                        
+        self.Iij = Iij 
+        self.Iijr = np.real(Iij) 
+        self.Iiji = np.imag(Iij) 
+
+        # line powerflows 
+        for m in range(self.nb):
+            for n in range(self.nb):
+                if n != m:
+                    Sij[m,n] = self.nodes[m].vmLf * np.conj(self.Iij[m,n]) * BMva
+
+        self.Sij = Sij
+        self.Pij = np.real(Sij) 
+        self.Qij = np.imag(Sij)
+
+        # line losses 
+        Lij = np.zeros(self.nl, dtype=complex) 
+        for line in self.lines: 
+            m = line.lineNumber - 1 
+            p = line.fromNode.nodeNumber
+            q = line.toNode.nodeNumber
+            Lij[m] = Sij[p, q] + Sij[q, p]
+
+        self.Lij = Lij
+        self.Lpij = np.real(Lij)
+        self.Lqij = np.imag(Lij)
+
+        # Bus power junction 
+        Si = np.zeros(self.nb, dtype=complex)
+        for i in range(self.nb):
+            for k in range(self.nb):
+                Si[i] += np.conj(self.nodes[i].vmLf) * self.nodes[k].vmLf * self.Y[i, k] * BMva
+
+        self.Si = Si 
+        self.Pi = np.real(Si) 
+        self.Qi = -np.imag(Si)
+        self.Pg = self.Pi.reshape([-1, 1]) + self.Pl.reshape([-1, 1])
+        self.Qg = self.Qi.reshape([-1, 1]) + self.Ql.reshape([-1, 1]) 
+
+
+    def loadflow(self, tol=1, maxIter=10000, BMva=100): 
+        self.iter = 0 
+        Pg = self.Pg / BMva 
+        Qg = self.Qg / BMva
+        Pl = self.Pl / BMva
+        Ql = self.Ql / BMva 
+        Psp = self.Psp / BMva 
+        Qsp = self.Qsp / BMva
+        G = np.real(self.Y) 
+        B = np.imag(self.Y) 
+        angles = np.zeros(self.nb, 1) 
+        npv = len(self.pv_nodes)
+        npq = len(self.pq_nodes)
+
+        while self.iter < 20 or (tol > 1e-5 and self.iter < maxIter):
+            self.iter += 1 
+            P = np.zeros((self.nb, 1))
+            Q = np.zeros((self.nb, 1)) 
+        
+            # Calculate the P and Q 
+            for node in self.nodes: 
+                i = node.nodeNumber
+                for k in range(self.nb):
+                    P[i] += node.vLf*self.nodes[k].vLf*(G[i,k]*np.cos(angles[i]-angles[k]) + B[i,k]*np.sin(angles[i]-angles[k]))
+                    Q[i] += node.vLf*self.nodes[k].vLf*(G[i,k]*np.sin(angles[i]-angles[k]) + B[i,k]*np.cos(angles[i]-angles[k]))
+            self.P = P 
+
+            # Calculation Q-limit violations 
+            if self.iter > 2 and self.iter <=7 :
+                for n in range(1, self.nb):
+                    if self.nodes[n].type == 2: 
+                        QG = Q[n] + Ql[n]
+                        if QG < self.nodes[n].Qmin/BMva: 
+                            self.nodes[n].vLf += 0.01
+                        elif QG > self.nodes[n].Qmax/BMva:
+                            self.nodes[n].vLf -= 0.01
+
+            # Calculate change in sepecified active and reactive power
+            dPa = Psp - P 
+            dQa = Qsp - Q 
+            k = 0 
+            dQ = np.zeros((self.npq, 1))
+            for node in self.pq_nodes:
+                i = node.nodeNumber
+                if node.type == 3:
+                    dQ[k] = dQa[i]
+                    k += 1
+            dP = dPa[1:self.nb]
+            M = np.vstack((dP, dQ)) 
+
+
+                                    
