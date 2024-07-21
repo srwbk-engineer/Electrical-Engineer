@@ -340,4 +340,50 @@ class Grid(object):
                     if n == m:
                         for n in range(self.nb):
                             J3[i, k] += self.nodes[m].vLf*self.nodes[n].vLf*(G[m,n]*np.cos(angles[m]-angles[n]) + B[m,n]*np.sin(angles[m]-angles[n]))
-                            
+            
+
+            # J4 is the derivative of Q with respect to V 
+            J4 = np.zeros((npq, npq)) 
+            for i in range(npq):
+                m = self.pq_nodes[i].nodeNumber
+                for k in range(npq): 
+                    n = self.pq_nodes[k].nodeNumber
+                    if n == m: 
+                        for n in range(self.nb): 
+                            J4[i, k] += self.nodes[n].vLf*(G[m,n]*np.sin(angles[m]-angles[n]) - B[m,n]*np.cos(angles[m]-angles[n]))
+                        J4[i, k] += self.nodes[m].vLf*G[m,m] 
+                    else :
+                        J4[i, k] = self.nodes[m].vLf*(G[m,n]*np.sin(angles[m]-angles[n]) - B[m,n]*np.cos(angles[m]-angles[n]))
+
+            self.J4 = J4 
+
+            self.J = np.vstack((np.hstack((J1, J2))), np.hstack((J3, J4)))
+
+            # end of Jacobian calculation 
+            # J X = M -- > J^-1 M 
+            X = np.linalg.solve(self.J, M) 
+            dTh = X[0:self.nb-1]
+            dV = X[self.nb-1:] 
+
+            # Update Angles and Voltages 
+            angles[1:] += dTh # angles[0] is the angles of the slack bus 
+            k=0 
+            for i in range(1, self.nb):
+                if self.nodes[i].type == 3:
+                    self.nodes[i].vLf += dV[k].item() 
+                    k += 1 
+                self.nodes[i].thetaLf = angles[i].item() 
+            
+            tol = max(abs(M)) 
+            self.tolerances.append((tol)) 
+            self.voltageLf = [self.nodes[i].vLf for i in range(self.nb)]
+            self.thetaLf = [self.nodes[i].thetaLf for i in range(self.nb)]
+
+        # the iteration is over; calculate the power flow 
+        self.calculateLf() 
+
+    def printResults(self):
+        print("Newton Raphson Results:")
+        print()
+        print('| Bus |   V   |   Angle   |    Injection   |   Generation   |   Load     |')
+        print('| No  |   pu  |   Degree  |   MW   |  Mvar |  MW   |   Mvar |  MW | Mvar |')
