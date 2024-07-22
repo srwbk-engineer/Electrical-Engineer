@@ -387,3 +387,32 @@ class Grid(object):
         print()
         print('| Bus |   V   |   Angle   |    Injection   |   Generation   |   Load     |')
         print('| No  |   pu  |   Degree  |   MW   |  Mvar |  MW   |   Mvar |  MW | Mvar |')
+        for i in range(self.nb): 
+            print(' | %3g | %8.3f | %8.3f | %8.3f | %8.3f | %8.3f | %8.3f | %8.3f | %8.3f |' % (i, self.nodes[i].vLf, 
+                                                                                                self.node[i].thetaLf,
+                                                                                                self.Pi[i],
+                                                                                                self.Qi[i],
+                                                                                                self.Pg[i],
+                                                                                                self.Qg[i],
+                                                                                                self.Pl[i],
+                                                                                                self.Ql[i]))
+        print('--------------------------------------------------------------------------')
+        print()
+        print(' Line flows and losses: ') 
+        print() 
+        print(' |From    |To   |    P    |    Q    |  From  |  To   |    P    |    Q   |   Line Loss   |')
+        print(' |Bus     |Bus  |   MW    |   Mvar  |  Bus   |  Bus  |   MW    |   Mvar |   MW   |    Mvar |')
+        for i in range(self.nl):
+            p = self.lines[i].fromNode.nodeNumber  
+            q = self.lines[i].toNode.nodeNumber
+            print('| %4g | %4g | %8.2f | %8.2f | %4g | %4g | %8.2f | %8.2f | %8.2f | %8.2f' % (p, q, self.Pij[p,q],
+                                                                                               self.Qij[p,q], 
+                                                                                               q, p,
+                                                                                               self.Pij[q,p],
+                                                                                               self.Qij[i],
+                                                                                               self.Lpij[i],
+                                                                                               self.Lpij[i]))
+        print('--------------------------------------------------------------------------')
+        print() 
+        print('Total active losses: {active_power:.2f}, Total reactive losses: {reactive_power:.2f}'.format(active_power=sum(self.Lpij).item(), reactive_power=sum(self.Lqij).item()))
+        
